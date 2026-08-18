@@ -1,0 +1,17 @@
+[tool.black]
+line-length = 88
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+    "E4", # pycodestyle import-related errors
+    "E7", # pycodestyle statement-related errors
+    "E9", # pycodestyle syntax and runtime errors
+    "F",  # Pyflakes rules, such as unused or undefined names
+]
