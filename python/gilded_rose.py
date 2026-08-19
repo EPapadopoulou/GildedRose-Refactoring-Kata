@@ -53,6 +53,12 @@ class SulfurasUpdateStrategy(ItemUpdateStrategy):
         pass
 
 
+class ConjuredItemUpdateStrategy(ItemUpdateStrategy):
+    def update_quality(self):
+        degradation = 4 if self.item.sell_in <= 0 else 2
+        self.decrease_quality(degradation)
+
+
 STRATEGIES_BY_NAME = {
     "Aged Brie": AgedBrieUpdateStrategy,
     "Backstage passes to a TAFKAL80ETC concert": BackstagePassUpdateStrategy,
@@ -61,6 +67,8 @@ STRATEGIES_BY_NAME = {
 
 
 def update_strategy_for(item):
+    if item.name.startswith("Conjured"):
+        return ConjuredItemUpdateStrategy(item)
     strategy = STRATEGIES_BY_NAME.get(item.name, NormalItemUpdateStrategy)
     return strategy(item)
 
