@@ -21,7 +21,7 @@ The constraints that most influenced my approach were:
 | Practice | What I did |
 |---|---|
 | Test first | Added focused tests before modifying production code |
-| Iterative steering | Revised my own fixture request after reviewing the unnecessary indirection it produced |
+| Iterative steering | Revised my own fixture request and later reduced an over-generated selector test set after reviewing the unnecessary complexity |
 | Behavioural validation | Used focused unit tests plus approval-style regression tests |
 | Scope control | Separated the behaviour-preserving refactor from the Conjured feature |
 | Design review | Challenged suggestions involving `Item`, Sulfuras no-ops, and item-name matching |
@@ -110,6 +110,17 @@ The TextTest golden master was updated in `bacbb6d` after reviewing the expected
 
 The matching rule was subsequently tightened so that only the exact name `"Conjured"` or names beginning with `"Conjured "` use the strategy. This supports Conjured as a category without classifying unrelated names such as `"Conjuredness"`.
 
+### 7. Reviewing AI-generated test scope
+
+After tightening the name-selection rule, I asked Cursor to add coverage. It generated ten additional cases, including direct assertions about the selected strategy class, repeated prefix examples, malformed names, and case-sensitivity behaviour that the requirements did not specify.
+
+I rejected that test set as disproportionate and coupled to implementation details. The existing `"Conjured Mana Cake"` tests already covered the prefix rule, so I retained only two public-behaviour cases:
+
+- exact `"Conjured"` uses Conjured degradation;
+- `"Conjuredness"` remains a normal item.
+
+The final focused suite therefore contains 27 cases rather than 35.
+
 ## Representative prompts
 
 ```text
@@ -143,6 +154,13 @@ NotImplementedError.
 Why do the tests pass if Conjured is not supported?
 ```
 
+```text
+Adding ten extra test cases for such a small change is overkill. The existing
+Conjured test already proves the prefix rule. Keep only the exact "Conjured"
+case and the "Conjuredness" non-match, and test behaviour rather than the
+strategy implementation.
+```
+
 ## Final architecture
 
 ```mermaid
@@ -162,7 +180,7 @@ flowchart TD
 
 | Area | Status |
 |---|---|
-| Focused unit-test cases | 25 passing |
+| Focused unit-test cases | 27 passing |
 | Existing behaviour | Protected by unit and regression tests |
 | Strategy refactor | Complete |
 | Conjured support | Complete |
@@ -185,7 +203,6 @@ a828f0a  Refactor item updates using Strategy
 bacbb6d  Update TextTest output for Conjured behaviour
 143db48  Refine Conjured item-name matching
 2c805e4  Add selected AI transcripts
-c224998  Curate the strategy transcript
 ```
 
 The descriptions above summarize the purpose of each commit; the repository retains the original commit messages.
@@ -199,6 +216,7 @@ The descriptions above summarize the purpose of each commit; the repository reta
 | Test-implementation transcript | `python/transcripts/cursor_unit_tests_for_gilded_rose.md` |
 | Strategy and design-review transcript | `python/transcripts/cursor_1_item_class_update_strategy.md` |
 | Conjured and approval-debugging transcript | `python/transcripts/cursor_conjured_support_test_results.md` |
+| Name-selection test-review transcript | `python/transcripts/cursor_new_name_selection_tests.md` |
 | Formatting and linting configuration | `python/pyproject.toml` |
 
-The four transcripts are selected exports from the relevant Cursor sessions. The strategy transcript explicitly notes that later unrelated or duplicated discussion was omitted; the retained dialogue is otherwise unchanged. No custom agent steering files or skills were used.
+The five transcripts are selected exports from the relevant Cursor sessions. The strategy transcript explicitly notes that later unrelated or duplicated discussion was omitted; the retained dialogue is otherwise unchanged. No custom agent steering files or skills were used.
