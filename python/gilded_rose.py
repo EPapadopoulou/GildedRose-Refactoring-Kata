@@ -67,14 +67,15 @@ STRATEGIES_BY_NAME = {
 
 
 def update_strategy_for(item):
-    if item.name.startswith("Conjured"):
+    if item.name.startswith(
+        "Conjured "
+    ):  # trailing space avoids matching "ConjuredNess"
         return ConjuredItemUpdateStrategy(item)
     strategy = STRATEGIES_BY_NAME.get(item.name, NormalItemUpdateStrategy)
     return strategy(item)
 
 
 class GildedRose(object):
-
     def __init__(self, items):
         self.items = items
 
