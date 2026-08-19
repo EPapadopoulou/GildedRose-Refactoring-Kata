@@ -188,3 +188,19 @@ def test_conjured_item_degrades_twice_as_fast(
 
     assert item.sell_in == expected_sell_in
     assert item.quality == expected_quality
+
+
+@pytest.mark.parametrize(
+    ("name", "expected_sell_in", "expected_quality"),
+    [
+        ("Conjured", 9, 18),
+        ("Conjuredness", 9, 19),
+    ],
+)
+def test_conjured_name_matching(name, expected_sell_in, expected_quality):
+    item = Item(name=name, sell_in=10, quality=20)
+
+    GildedRose(items=[item]).update_quality()
+
+    assert item.sell_in == expected_sell_in
+    assert item.quality == expected_quality
