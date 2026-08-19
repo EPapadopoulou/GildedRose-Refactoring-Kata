@@ -1,276 +1,204 @@
 # Gilded Rose Kata — AI-Assisted Development Summary
 
-**Candidate:** Eliza Papadopoulou  
-**Language:** Python  
-**Tool:** Cursor IDE (AI coding assistant / agent mode)  
-**Period:** Aug 18–19, 2026  
+**Candidate:** Eliza Papadopoulou
+**Language:** Python
+**Tool:** Cursor IDE (AI coding assistant / agent mode)
+**Period:** 18–19 August 2026
 
----
+## Assignment context
 
-## Assignment Context
+The exercise asked me to refactor the functionally correct legacy implementation, preserve its existing behaviour, and add support for Conjured items. AI use was explicitly encouraged, with emphasis on how its output was directed, validated, and reviewed.
 
-Technical test completed with AI assistance, as encouraged by the interviewer. The goal was not only the final code, but also to show how AI was guided, validated, and reviewed.
+The constraints that most influenced my approach were:
 
-Key constraints from [GildedRoseRequirements.md](../GildedRoseRequirements.md):
+- do not alter the `Item` class or the `items` property;
+- treat the existing implementation as authoritative where requirements are ambiguous;
+- preserve existing behaviour during refactoring;
+- add Conjured behaviour as a separate feature.
 
-- Refactor the existing, functionally correct implementation
-- Add **Conjured** items (degrade twice as fast as normal items)
-- **Do not alter the `Item` class**
-- Where requirements are ambiguous, treat the existing implementation as authoritative
-
----
-
-## How I Worked With AI
+## How I worked with AI
 
 | Practice | What I did |
-|----------|------------|
-| Test-first | Asked for unit tests before any production code changes |
-| Iterative steering | Rejected fixtures, factories, and Item subclasses; gave precise constraints until tests matched my intent |
-| Validation | Ran pytest, TextTest, and ApprovalTests; questioned unexpected results |
-| Design review | Challenged AI on Strategy vs inheritance, Sulfuras no-ops, and Conjured name matching |
-| Correction | Fixed wrong AI advice (e.g. removing `SulfurasUpdateStrategy.update_quality()`) |
+|---|---|
+| Test first | Added focused tests before modifying production code |
+| Iterative steering | Revised my own fixture request after reviewing the unnecessary indirection it produced |
+| Behavioural validation | Used focused unit tests plus approval-style regression tests |
+| Scope control | Separated the behaviour-preserving refactor from the Conjured feature |
+| Design review | Challenged suggestions involving `Item`, Sulfuras no-ops, and item-name matching |
+| Output review | Inspected changed golden-master output rather than approving it blindly |
 
----
+## Development process
 
-## Session Highlights
+### 1. Test planning
 
-Condensed from 9 Cursor agent sessions. Tool calls, patch details, and repeated prompts are omitted.
+My initial prompt asked Cursor to test every rule in the specification while following the existing test conventions. Cursor identified that the starter test used `unittest`, while pytest was already available, and I chose pytest for its readable parameterization.
 
-### 1. Environment setup (Aug 18)
+I initially requested fixtures, then reviewed the proposed structure and concluded that they obscured relevant inputs. I revised the instruction to:
 
-**Me:** Set up venv, fix IDE import error for `approvaltests`, follow the README.
+- construct `Item` directly in each test;
+- parameterize meaningful values such as initial `sell_in`, initial quality, and expected results;
+- parameterize only cases expressing the same business rule;
+- keep existing categories separate;
+- keep Conjured tests separate and expected to fail before implementation;
+- leave production code unchanged.
 
-**AI:** Created `python/venv`, pointed IDE at it via `.vscode/settings.json` and `pyrightconfig.json`. Confirmed package was installed — the issue was the wrong Python interpreter.
+This interaction is retained because it demonstrates correction of my own earlier direction after reviewing the AI-generated design.
 
-**Outcome:** Environment working. Approval test still needs reporter config (separate issue).
+### 2. Characterization and feature tests
 
----
+Cursor implemented 25 pytest cases covering:
 
-### 2. Test planning (Aug 18)
+| Behaviour | Cases |
+|---|---:|
+| Normal-item degradation and quality floor | 5 |
+| Aged Brie increases and quality cap | 5 |
+| Backstage threshold changes and cap | 6 |
+| Backstage expiry | 2 |
+| Sulfuras invariance | 3 |
+| Conjured degradation and quality floor | 4 |
 
-**Me:** Write unit tests for every spec rule before refactoring. Iterated on test style:
+Before Conjured was implemented, 23 cases passed and the two distinguishing Conjured cases failed as expected. The other two Conjured boundary cases reached zero under both normal and Conjured degradation.
 
-- First asked for fixtures, then specific fixtures per item type
-- Rejected fixture-based tests — wanted `@pytest.mark.parametrize` with visible `Item` construction
-- Final instruction: no fixtures/factories; parametrize inputs and expected outputs; characterization tests must pass; only Conjured tests should fail; do not change production code
+Tests were committed before production changes in `5129c09`.
 
-**AI:** Produced a test plan, then implemented 25 parametrized pytest tests in `test_gilded_rose.py`.
+### 3. Design choice
 
-**Outcome:** 23 passed, 2 Conjured failures (expected). Commit: `5129c09`.
+I considered adding behaviour to `Item` and using subclasses, then checked the restriction with Cursor. The conclusion was that changing or subclassing `Item` would conflict with the stated ownership constraint and could require callers to construct different types.
 
----
+I chose separate update strategies wrapping the existing `Item` objects. The resulting design combines:
 
-### 3. Design before refactor (Aug 18)
+- Strategy for category-specific update rules;
+- a small Template Method in `ItemUpdateStrategy.update()` for the common sequence;
+- centralized selection in `update_strategy_for()`.
 
-**Me:** Can I add `update_quality()` to `Item` and use subclasses?
+I retained explicit no-op implementations of both `update()` and `update_quality()` for Sulfuras. This keeps the concrete strategy behaviour correct even if `update_quality()` is called directly in future code.
 
-**AI:** No — spec says do not alter `Item`. Use Strategy pattern with separate updater classes instead.
+### 4. Behaviour-preserving refactor
 
-**Me:** Does the original code meet the spec?
+Cursor initially introduced the strategy structure together with Conjured support. When the regression output showed Conjured as the only behavioural difference, I separated the work:
 
-**AI:** Mostly yes, except Conjured items are treated as normal items.
+1. temporarily remove Conjured support;
+2. verify that the refactor preserves existing output;
+3. commit the refactor independently;
+4. add Conjured afterward as a feature.
 
-**Outcome:** Confirmed test-first approach and chose Strategy over inheritance.
+The behaviour-preserving refactor introduced four concrete strategies for the existing categories and was committed in `a828f0a`. The `Item` class remained unchanged.
 
----
+### 5. Approval and regression testing
 
-### 4. Refactoring (Aug 18–19)
+The repository contains two broad-output regression mechanisms in addition to the focused unit tests:
 
-**Me:** Refactor using Strategy pattern.
+- ApprovalTests.Python captures the 30-day fixture output in pytest;
+- TextTest runs the same fixture and compares it with its saved output.
 
-**AI:** Replaced nested if/else in `gilded_rose.py` with `ItemUpdateStrategy` + 5 concrete strategies, `STRATEGIES_BY_NAME`, and `update_strategy_for()`. `Item` unchanged.
+Cursor helped explain the received/approved workflow, but I reviewed the differences before accepting new output. This exposed an important distinction:
 
-**Me:** Why `startswith("Conjured")` instead of a dict key?
+- characterization output records existing behaviour;
+- Conjured tests express the new required behaviour.
 
-**AI:** Matches `"Conjured Mana Cake"` in the fixture; Conjured is a category, not a fixed product name.
+The approved Conjured output was prepared in `022a3d6` and corrected in `9fa5373`. The production feature followed in a separate commit.
 
-**Me:** Run TextTest regression tests.
+### 6. Conjured feature
 
-**AI:** Switched `texttests/config.gr` to Python. TextTest failed on Conjured (golden master had old behavior). Removed Conjured strategy temporarily so refactor preserved existing behavior. TextTest passed.
+`ConjuredItemUpdateStrategy` was added in `546046b`:
 
-**Outcome:** Clean refactor committed (`a828f0a`). Conjured deferred to next step.
+- quality decreases by 2 before the sell-by date;
+- quality decreases by 4 on or after the sell-by date;
+- quality does not fall below zero.
 
----
+The TextTest golden master was updated in `bacbb6d` after reviewing the expected Conjured-only changes.
 
-### 5. Design review (Aug 19)
+The matching rule was subsequently tightened so that only the exact name `"Conjured"` or names beginning with `"Conjured "` use the strategy. This supports Conjured as a category without classifying unrelated names such as `"Conjuredness"`.
 
-**Me:** Was Strategy the right choice? Should `SulfurasUpdateStrategy.update_quality()` be removed?
+## Representative prompts
 
-**AI:** Strategy is appropriate. Suggested removing redundant `update_quality()` on Sulfuras.
-
-**Me:** No — Sulfuras must explicitly no-op on `update_quality()` too, or a direct call could raise `NotImplementedError` or behave wrongly.
-
-**AI:** Agreed. Both `update()` and `update_quality()` should be explicit no-ops for Sulfuras.
-
-**Outcome:** Safer interface design kept in final code.
-
----
-
-### 6. ApprovalTests debugging (Aug 19)
-
-**Me:** Explain approval tests. Why is `approved.txt` empty? Why does renaming it and re-running do nothing?
-
-**AI:** ApprovalTests compares full fixture output to a golden master file. First run creates `received.txt`; you approve by renaming to `approved.txt`. Running the test file directly with `python` does not invoke pytest — use `pytest` instead.
-
-**Me:** Why do tests pass if Conjured is not supported?
-
-**AI:** Two different test types:
-- **Unit tests** check the spec → Conjured tests fail
-- **Approval tests** check recorded behavior → pass because golden master was captured from old (wrong) Conjured behavior
-
-**Outcome:** Updated approved file for correct Conjured output. Commits: `fba48ef`, `022a3d6`, `9fa5373`.
-
----
-
-### 7. Conjured feature (Aug 19)
-
-**Me:** Shared terminal output — unit tests pass, approval test fails.
-
-**AI:** Expected. Code now produces correct Conjured values; approved file still has old ones. Fix by updating the golden master.
-
-**Outcome:** `ConjuredItemUpdateStrategy` added (degrade by 2 before sell date, 4 after). All 25 unit tests pass.
-
----
-
-## Key Prompts (Representative)
-
-Short list of the most important instructions I gave. Full wording is preserved for the longest, most shaping prompts.
-
-```
-Write unit tests for gilded_rose.py covering all restrictions in GildedRoseRequirements.md.
-Do not modify production code. Only Conjured tests should fail.
+```text
+Write unit tests for gilded_rose.py covering all restrictions in
+GildedRoseRequirements.md. Do not modify production code.
+Only Conjured tests should fail.
 ```
 
-```
+```text
 Revise the test plan: no fixtures. Keep Item construction visible in tests.
-Use @pytest.mark.parametrize for sell_in, quality, expected sell_in, expected quality.
-Separate characterization tests from Conjured tests. Run baseline before and after.
+Use @pytest.mark.parametrize for sell_in, quality, expected sell_in, and
+expected quality. Separate characterization tests from Conjured tests.
 ```
 
-```
-Does the spec mean I cannot change Item? I was thinking of subclasses with update_quality().
-→ Led to Strategy pattern instead.
-```
-
-```
-Begin refactoring using the Strategy pattern for different item update rules.
+```text
+Does the specification mean I cannot change Item? I was thinking of
+subclasses with update_quality().
 ```
 
-```
-Why startswith("Conjured") and not a dict key?
-→ Questioned AI assumption; kept after understanding fixture data.
-```
-
-```
-Use TextTest regression tests. Defer Conjured until existing behavior is preserved.
+```text
+Use the TextTest regression tests. Keep this stage as a behaviour-preserving
+refactor and add Conjured afterward.
 ```
 
-```
-Sulfuras must explicitly no-op update_quality(), not inherit NotImplementedError.
-→ I corrected the AI's suggestion to remove the method.
-```
-
-```
-Why do tests pass if Conjured is not supported?
-→ Led to understanding approval vs unit test difference.
+```text
+Sulfuras must explicitly no-op update_quality(), rather than inherit
+NotImplementedError.
 ```
 
----
+```text
+Why do the tests pass if Conjured is not supported?
+```
 
-## Work Summary
-
-### Phase 1 — Environment
-- Python venv, IDE config, README walkthrough
-
-### Phase 2 — Unit tests (no production changes)
-- **25 parametrized pytest tests** in `tests/test_gilded_rose.py`
-- Commit `5129c09`
-
-| Test | Cases |
-|------|-------|
-| `test_normal_item_degrades` | 5 |
-| `test_aged_brie_increases_in_quality` | 5 |
-| `test_backstage_passes_increase_in_quality_before_concert` | 6 |
-| `test_backstage_passes_drop_to_zero_after_concert` | 2 |
-| `test_sulfuras_never_changes` | 3 |
-| `test_conjured_item_degrades_twice_as_fast` | 4 |
-
-### Phase 3 — Strategy refactor
-- `ItemUpdateStrategy` + 5 concrete strategies
-- `STRATEGIES_BY_NAME` + `update_strategy_for()` factory
-- `Item` class unchanged
-- Commit `a828f0a`
-
-| Decision | Choice |
-|----------|--------|
-| Subclass `Item`? | No |
-| Pattern | Strategy + Template Method |
-| Conjured matching | `item.name.startswith("Conjured")` |
-| Sulfuras | Explicit no-op on `update()` and `update_quality()` |
-
-### Phase 4 — Conjured + approval tests
-- `ConjuredItemUpdateStrategy` added
-- Approval golden master updated
-- TextTest configured for Python
-- Commits `fba48ef`, `022a3d6`, `9fa5373`
-
----
-
-## Architecture
+## Final architecture
 
 ```mermaid
 flowchart TD
-    GR[GildedRose.update_quality]
-    Factory[update_strategy_for]
-    GR --> Factory
-
-    Factory -->|startswith Conjured| Conjured[ConjuredItemUpdateStrategy]
-    Factory -->|exact name lookup| Named[Aged Brie / Backstage / Sulfuras]
-    Factory -->|default| Normal[NormalItemUpdateStrategy]
-
-    Conjured --> Update[strategy.update]
-    Named --> Update
+    GR["GildedRose.update_quality"] --> Selector["update_strategy_for"]
+    Selector -->|"exact named category"| Named["Aged Brie / Backstage / Sulfuras"]
+    Selector -->|"Conjured or Conjured prefix"| Conjured["ConjuredItemUpdateStrategy"]
+    Selector -->|"otherwise"| Normal["NormalItemUpdateStrategy"]
+    Named --> Update["strategy.update"]
+    Conjured --> Update
     Normal --> Update
-
-    Update --> UQ[update_quality]
-    Update --> SI[sell_in -= 1]
-
-    Sulfuras[SulfurasUpdateStrategy] -.->|no-op both methods| Update
+    Update --> Quality["category-specific quality rule"]
+    Update --> SellIn["sell_in update"]
 ```
 
----
-
-## Current State
+## Current state
 
 | Area | Status |
-|------|--------|
-| Unit tests | 25 — all pass with Conjured |
-| Strategy refactor | Committed |
-| Conjured support | Implemented |
-| Approval test | Golden master updated |
-| TextTest | Configured for Python |
+|---|---|
+| Focused unit-test cases | 25 passing |
+| Existing behaviour | Protected by unit and regression tests |
+| Strategy refactor | Complete |
+| Conjured support | Complete |
+| `Item` class | Unchanged |
+| Approval output | Updated after review |
+| TextTest output | Updated after review |
+| Formatting and linting configuration | Included in `pyproject.toml` |
 
----
+## Relevant Git history
 
-## Git History (AI-assisted)
-
+```text
+5129c09  Add comprehensive Python unit tests without changing production code
+cba9ed5  Configure Black, isort, and Ruff
+fba48ef  Configure approval tests
+a828f0a  Refactor item updates using Strategy
+022a3d6  Review and update approved Conjured output
+9fa5373  Correct approved output
+546046b  Add ConjuredItemUpdateStrategy
+6ede1e8  Add formatting tools and tighten project hygiene
+bacbb6d  Update TextTest output for Conjured behaviour
+143db48  Refine Conjured item-name matching
+2c805e4  Add selected AI transcripts
+c224998  Curate the strategy transcript
 ```
-5129c09  phase 1 complete. Added comprehensive unit tests (python). Production code not altered
-cba9ed5  Add configuration for Black, isort, and Ruff in pyproject.toml
-a828f0a  Refactor Gilded Rose item update logic by implementing strategy pattern
-fba48ef  configure approvaltests
-022a3d6  reviewed approvaltests and fixed conjured
-9fa5373  corrected approvalstest output
-```
 
----
+The descriptions above summarize the purpose of each commit; the repository retains the original commit messages.
 
-## Other Artefacts
+## Submitted AI artefacts
 
 | Artefact | Location |
-|----------|----------|
-| Test implementation plan | `.cursor/plans/gilded_rose_unit_tests_67856690.plan.md` |
-| IDE config | `.vscode/settings.json`, `pyrightconfig.json` |
-| Linting | `pyproject.toml` |
+|---|---|
+| Initial test plan | `.cursor/plans/gilded_rose_unit_tests_67856690.plan.md` |
+| Test-planning transcript | `python/transcripts/cursor_1_unit_tests_for_gilded_rose.md` |
+| Test-implementation transcript | `python/transcripts/cursor_unit_tests_for_gilded_rose.md` |
+| Strategy and design-review transcript | `python/transcripts/cursor_1_item_class_update_strategy.md` |
+| Conjured and approval-debugging transcript | `python/transcripts/cursor_conjured_support_test_results.md` |
+| Formatting and linting configuration | `python/pyproject.toml` |
 
-Raw Cursor session logs (JSONL) remain in the local Cursor data folder if needed for the interview.
+The four transcripts are selected exports from the relevant Cursor sessions. The strategy transcript explicitly notes that later unrelated or duplicated discussion was omitted; the retained dialogue is otherwise unchanged. No custom agent steering files or skills were used.
